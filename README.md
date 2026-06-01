@@ -1,12 +1,12 @@
-# Aprilaire E070 Dehumidifier Controller
+# AprilAire E070 Dehumidifier Controller
 
-An ESP32-C6 based replacement for the Aprilaire Model 76 remote control, integrating the Aprilaire E070 dehumidifier with Home Assistant via MQTT over Wi-Fi.
+An ESP32-C6 based replacement for the AprilAire Model 76 remote control, integrating the AprilAire E070 dehumidifier with Home Assistant via MQTT over Wi-Fi.
 
 ![Home Assistant Device Page](docs/ha_device.png)
 
 ## Overview
 
-The Aprilaire E070 dehumidifier communicates with its Model 76 remote control over a proprietary RS-485 bus. This project reverse-engineers that protocol and replaces the Model 76 with an ESP32-C6 microcontroller, adding:
+The AprilAire E070 dehumidifier communicates with its Model 76 remote control over a proprietary RS-485 bus. This project reverse-engineers that protocol and replaces the Model 76 with an ESP32-C6 microcontroller, adding:
 
 - Wi-Fi connectivity with a captive portal for easy setup
 - MQTT integration with automatic Home Assistant device discovery
@@ -37,7 +37,7 @@ The Aprilaire E070 dehumidifier communicates with its Model 76 remote control ov
 | 3.3V | VCC |
 | GND | GND |
 
-Connect the MAX485 A and B terminals to the Aprilaire E070 RS-485 bus (the `A B` terminals on the E070 terminal block).
+Connect the MAX485 A and B terminals to the AprilAire E070 RS-485 bus (the `A B` terminals on the E070 terminal block).
 
 #### BME280 (LP I2C via StemmaQT)
 
@@ -119,13 +119,13 @@ idf.py flash monitor
 
 ### First-Time Setup
 
-1. Flash the firmware — on first boot with no saved credentials the ESP32 starts a Wi-Fi access point named **Aprilaire-Setup**
-2. Connect your phone or computer to **Aprilaire-Setup**
+1. Flash the firmware — on first boot with no saved credentials the ESP32 starts a Wi-Fi access point named **AprilAire-Setup**
+2. Connect your phone or computer to **AprilAire-Setup**
 3. A captive portal will open automatically — if it doesn't, navigate to `http://192.168.4.1`
 4. Enter your Wi-Fi network name and password
 5. Enter your MQTT broker address, port, and credentials
 6. Click **Save & Connect** — the device restarts and connects to your network
-7. In Home Assistant go to **Settings → Devices & Services → MQTT** — the **Aprilaire E070 Dehumidifier** device will appear automatically
+7. In Home Assistant go to **Settings → Devices & Services → MQTT** — the **AprilAire E070 Dehumidifier** device will appear automatically
 
 ### Resetting Wi-Fi Credentials
 
@@ -227,7 +227,7 @@ GPLv3 License — see [LICENSE](LICENSE) for details.
 
 ## Acknowledgements
 
-Protocol reverse-engineered via logic analyzer captures of the Aprilaire Model 76 remote control communicating with the E070 dehumidifier. This project is not affiliated with or endorsed by Aprilaire.
+Protocol reverse-engineered via logic analyzer captures of the AprilAire Model 76 remote control communicating with the E070 dehumidifier. This project is not affiliated with or endorsed by AprilAire.
 
 ## Legal
 

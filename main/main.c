@@ -453,7 +453,7 @@ static void mqtt_publish_discovery(void)
     snprintf(device, sizeof(device),
              "\"device\": {"
              "\"identifiers\": [\"aprilaire_e070_%s\"], "
-             "\"name\": \"Aprilaire E070 Dehumidifier\", "
+             "\"name\": \"AprilAire E070 Dehumidifier\", "
              "\"model\": \"E070\", "
              "\"manufacturer\": \"DR\", "
              "\"sw_version\": \"0.0.1\""
