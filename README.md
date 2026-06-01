@@ -228,3 +228,12 @@ GPLv3 License — see [LICENSE](LICENSE) for details.
 ## Acknowledgements
 
 Protocol reverse-engineered via logic analyzer captures of the Aprilaire Model 76 remote control communicating with the E070 dehumidifier. This project is not affiliated with or endorsed by Aprilaire.
+
+## Legal
+
+This project is an independent interoperability implementation developed 
+under the DMCA interoperability exemption (17 U.S.C. § 1201(f)). It is 
+not affiliated with, endorsed by, or sponsored by AprilAire or Research 
+Products Corporation. Use at your own risk. The authors make no warranty 
+regarding the safety or reliability of this software for controlling 
+HVAC equipment.
