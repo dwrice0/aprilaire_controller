@@ -23,8 +23,6 @@ build/
 *.a
 *.out
 *.exe # For any host-side utilities compiled on Windows
-.vscode/ # If using Visual Studio Code, ignore its workspace settings and extensions
-.devcontainer/ # If using Dev Containers, ignore their configuration and state files
 
 # ESP-IDF specific build outputs
 *.bin
@@ -78,3 +76,12 @@ Desktop.ini
 *.workspace # General workspace files, can be from various tools
 *.suo       # Visual Studio Solution User Options
 *.sln.docstates # Visual Studio
+.vscode/ # If using Visual Studio Code, ignore its workspace settings and extensions
+**/.vscode/ # If using Visual Studio Code, ignore its workspace settings and extensions
+.devcontainer/ # If using Dev Containers, ignore their configuration and state files
+**/.devcontainer/ # If using Dev Containers, ignore their configuration and state files
+.devcontainer/devcontainer.json
+.devcontainer/Dockerfile
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/settings.json
