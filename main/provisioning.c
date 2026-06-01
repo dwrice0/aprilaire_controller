@@ -16,7 +16,7 @@
 
 static const char *TAG = "provisioning";
 
-#define PROV_AP_SSID        "AprilAire-Setup"
+#define PROV_AP_SSID        "Aprilaire-Setup"
 #define PROV_AP_PASS        ""              /* open AP */
 #define PROV_AP_IP          "192.168.4.1"
 #define NVS_NAMESPACE       "wifi_creds"
@@ -36,7 +36,7 @@ static char s_password[64] = {0};
 static const char *PORTAL_HTML =
     "<!DOCTYPE html><html><head>"
     "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-    "<title>AprilAire Setup</title>"
+    "<title>Aprilaire Setup</title>"
     "<style>"
     "body{font-family:sans-serif;max-width:400px;margin:40px auto;padding:0 20px;}"
     "h2{color:#1a73e8;}h3{color:#555;font-size:14px;margin:16px 0 4px;}"
@@ -48,7 +48,7 @@ static const char *PORTAL_HTML =
     ".divider{border-top:1px solid #eee;margin:16px 0;}"
     ".hint{font-size:12px;color:#888;margin:-4px 0 8px;}"
     "</style></head><body>"
-    "<h2>AprilAire E070 Setup</h2>"
+    "<h2>Aprilaire E070 Setup</h2>"
     "<form method='POST' action='/save'>"
     "<h3>Wi-Fi</h3>"
     "<input type='text'     name='ssid'     placeholder='Wi-Fi network name' required>"
@@ -67,7 +67,7 @@ static const char *PORTAL_HTML =
 static const char *SUCCESS_HTML =
     "<!DOCTYPE html><html><head>"
     "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-    "<title>AprilAire Setup</title>"
+    "<title>Aprilaire Setup</title>"
     "<style>body{font-family:sans-serif;max-width:400px;margin:40px auto;padding:0 20px;}"
     "h2{color:#137333;}.box{background:#e6f4ea;padding:20px;border-radius:8px;}"
     "</style></head><body>"
@@ -75,7 +75,7 @@ static const char *SUCCESS_HTML =
     "<div class='box'>"
     "<p>Credentials saved successfully.</p>"
     "<p>The device will now restart and connect to your Wi-Fi network.</p>"
-    "<p>You can close this page and disconnect from <strong>AprilAire-Setup</strong>.</p>"
+    "<p>You can close this page and disconnect from <strong>Aprilaire-Setup</strong>.</p>"
     "</div></body></html>";
 
 /* ── NVS helpers ────────────────────────────────────────────────────────── */
