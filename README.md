@@ -37,9 +37,7 @@ The AprilAire E070 dehumidifier communicates with its Model 76 remote control ov
 | 3.3V | VCC |
 | GND | GND |
 
-Connect the MAX485 A and B terminals to the AprilAire E070 RS-485 bus (the `+ -` terminals on the E070 terminal block, or the A and B wires from the Model 76 connector).
-
-> **Note:** The MAX485 module must expose DE and RE pins for transmit/receive switching. Modules with DE/RE hardwired internally are not compatible.
+Connect the MAX485 A and B terminals to the AprilAire E070 RS-485 bus (the `A B` terminals on the E070 terminal block).
 
 #### BME280 (LP I2C via StemmaQT)
 
@@ -222,10 +220,6 @@ The ESP32-C6's LP UART has a 16-byte hardware FIFO. Since the R-frame is 17 byte
 ### Timing
 
 The E070 expects an R-frame response within approximately 2ms of the M-frame ending. The firmware uses `vTaskDelay(pdMS_TO_TICKS(2))` before transmitting. If the E070 doesn't respond to commands, try reducing this value or replacing it with `esp_rom_delay_us(2000)` for a more precise delay.
-
-### Half-Duplex Bus
-
-The RS-485 bus is half-duplex. The MAX485 module must have DE and RE pins exposed and connected together to a GPIO for direction control. The current implementation toggles direction via GPIO before transmitting and returns to receive mode after the frame is sent.
 
 ## License
 
