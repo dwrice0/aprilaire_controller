@@ -89,7 +89,7 @@ typedef struct {
     bool m_running;         // true if M! (dehumidifier running), false if M? (idle)
     int m_rh;               // RH from M-frame (controller's RH reading, live only during run)
     bool r_on;              // true if E070 is on (R[0]=0x01), false if off (R[0]=0x00)
-    int r_dryness;          // setpoint from R-frame (1-6)
+    int r_dryness;          // setpoint from R-frame (1-7)
     int r_rh;               // RH*10 from R-frame Model 76 sensor (divide by 10 for %)
     int r_temp;             // temp*10 from R-frame Model 76 sensor (divide by 10 for °C)
     bool r_temp_valid;      // true if sep=0x00, false if sensor initializing (sep=0x01)
@@ -298,7 +298,7 @@ static uint8_t parse_packet(const uint8_t *buf, size_t len, aprilaire_state_t *s
             } else {
                 ESP_LOGW(TAG, "R-frame: invalid r_on=0x%02X", r_on);
             }
-            if (r_dryness >= 1 && r_dryness <= 6) {
+            if (r_dryness >= 1 && r_dryness <= 7) {
                 state->r_dryness = r_dryness;
                 r_updated = true;
             } else {
@@ -427,8 +427,8 @@ static void handle_set_command(const char *payload, int payload_len)
         p += 9;
         while (*p == ' ' || *p == ':' || *p == '\t') p++;
         int d = atoi(p);
-        if (d >= 1 && d <= 6) new_dryness = d;
-        else ESP_LOGW(TAG, "SET: dryness %d out of range 1-6", d);
+        if (d >= 1 && d <= 7) new_dryness = d;
+        else ESP_LOGW(TAG, "SET: dryness %d out of range 1-7", d);
     }
 
     /* Write atomically */
@@ -528,7 +528,7 @@ static void mqtt_publish_discovery(void)
              "\"command_topic\": \"aprilaire/set\", "
              "\"command_template\": \"{\\\"dryness\\\": {{ value | int }}}\", "
              "\"min\": 1, "
-             "\"max\": 6, "
+             "\"max\": 7, "
              "\"step\": 1, "
              "\"mode\": \"slider\", "
              "%s}",

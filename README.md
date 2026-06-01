@@ -86,7 +86,7 @@ STX  'R'  on[2]  dryness[2]  rh[4]  sep[2]  temp[2]  cs[2]  ETX
 | Field | Description |
 |-------|-------------|
 | on | `01` = run enabled, `00` = off |
-| dryness | Setpoint 1–6 as 2 hex chars |
+| dryness | Setpoint 1–7 as 2 hex chars |
 | rh | Controller RH × 10 as 4 hex chars (e.g. `0226` = 55.0%) |
 | sep | `00` = temperature valid, `01` = temperature not yet valid |
 | temp | Controller temp × 10 as 2 hex chars (e.g. `D8` = 21.6°C) |
@@ -145,7 +145,7 @@ The firmware uses MQTT Discovery to automatically create a device in Home Assist
 | Entity | Type | Description |
 |--------|------|-------------|
 | Dehumidifier Power | Switch | Enable/disable the dehumidifier |
-| Dryness Setpoint | Number (1–6) | Target dryness level |
+| Dryness Setpoint | Number (1–7) | Target dryness level |
 | Dehumidifier RH | Sensor | RH% reported by the E070's internal sensor |
 | Dehumidifier Running | Binary Sensor | Whether the E070 is actively running |
 | Controller RH | Sensor | RH% from the BME280 (calibration-corrected) |
