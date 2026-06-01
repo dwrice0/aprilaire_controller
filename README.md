@@ -229,7 +229,7 @@ The RS-485 bus is half-duplex. The MAX485 module must have DE and RE pins expose
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+GPLv3 License — see [LICENSE](LICENSE) for details.
 
 ## Acknowledgements
 
