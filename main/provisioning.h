@@ -12,3 +12,4 @@ bool provisioning_get_mqtt_config(char *host, size_t host_len,
                                   char *user, size_t user_len,
                                   char *pass, size_t pass_len);
 void provisioning_clear(void);
+bool provisioning_get_ota_url(char *url, size_t url_len);

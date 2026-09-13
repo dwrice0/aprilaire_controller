@@ -29,8 +29,12 @@
 #include "provisioning.h"
 #include "driver/rmt_tx.h"
 #include "driver/rmt_encoder.h"
+#include "esp_http_client.h"
+#include "esp_https_ota.h"
+#include "esp_ota_ops.h"
 
 static const char *TAG = "aprilaire";
+static const char *APP_VERSION = "aprilaire-v1.2.3";
 
 #define RESET_BUTTON_GPIO GPIO_NUM_10
 #define RGB_LED_GPIO        GPIO_NUM_8
@@ -46,9 +50,11 @@ static const char *TAG = "aprilaire";
 #define MQTT_TOPIC_STATUS       "aprilaire/status"
 #define MQTT_TOPIC_RAW          "aprilaire/raw"
 #define MQTT_TOPIC_SET          "aprilaire/set"
+#define MQTT_TOPIC_OTA          "aprilaire/ota"
+#define MQTT_TOPIC_OTA_STATUS   "aprilaire/ota/status"
 //#define MQTT_TOPIC_CALIBRATE    "aprilaire/calibrate"
 #define WIFI_CONNECT_TIMEOUT_MS 10000
-#define WIFI_MAXIMUM_RETRY      5
+#define WIFI_MAXIMUM_RETRY      0 /* 0 = infinite */
 
 /* UART */
 #define EX_UART_NUM LP_UART_NUM_0
@@ -175,9 +181,66 @@ static void ws2812_off(void)
     ws2812_set_color(0, 0, 0);
 }
 
+static bool app_is_healthy(void)
+{
+    // Put your real post-boot checks here:
+    // - MQTT connected?
+    // - sensor reading valid?
+    // - expected state present?
+    // - version string matches expected?
+    return true;
+}
+
+static void confirm_and_commit_ota(void)
+{
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    if (!running) {
+        ESP_LOGW(TAG, "No running app partition found");
+        return;
+    }
+
+    /* Factory app does not have OTA state metadata */
+    if (running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY) {
+        ESP_LOGI(TAG, "Booted from factory; no OTA verify state to check");
+        return;
+    }
+
+    esp_ota_img_states_t state;
+    esp_err_t err = esp_ota_get_state_partition(running, &state);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "OTA state lookup failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    if (state != ESP_OTA_IMG_PENDING_VERIFY) {
+        ESP_LOGI(TAG, "No pending OTA confirmation for this boot");
+        return;
+    }
+
+    ESP_LOGI(TAG, "Pending OTA verify detected; confirming update");
+
+    if (!app_is_healthy()) {
+        ESP_LOGW(TAG, "App health check failed; not confirming OTA");
+        return;
+    }
+    
+    err = esp_ota_mark_app_valid_cancel_rollback();
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "OTA confirmed and rollback canceled");
+    } else {
+        ESP_LOGE(TAG, "Confirm failed: %s", esp_err_to_name(err));
+    }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * Reset button check
  * ═══════════════════════════════════════════════════════════════════════════ */
+
+static bool running_from_factory_partition(void)
+{
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    return running != NULL && running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY;
+}
 
 static void check_reset_button(void)
 {
@@ -188,36 +251,64 @@ static void check_reset_button(void)
     if (gpio_get_level(RESET_BUTTON_GPIO) != 0) return;
 
     ws2812_init();
-    ESP_LOGI(TAG, "Reset button held — keep holding for 3 seconds...");
+    ESP_LOGI(TAG, "Reset button held — keep holding for 3s to re-provision, 10s for factory restore");
 
-    /* Flash yellow while counting */
     int held_ms = 0;
     bool led_state = false;
-    while (gpio_get_level(RESET_BUTTON_GPIO) == 0 && held_ms < 3000) {
-        led_state = !led_state;
-        ws2812_set_color(led_state ? 32 : 0,
-                         led_state ? 32 : 0,
-                         0);  /* dim yellow flash */
+    while (gpio_get_level(RESET_BUTTON_GPIO) == 0 && held_ms < 10000) {
+        if (held_ms < 3000) {
+            led_state = !led_state;
+            ws2812_set_color(led_state ? 32 : 0,
+                             led_state ? 32 : 0,
+                             0);  /* dim yellow flash */
+        } else {
+            ws2812_set_color(0, 64, 0);  /* solid green after 3s */
+        }
         vTaskDelay(pdMS_TO_TICKS(250));
         held_ms += 250;
     }
 
     if (held_ms < 3000) {
-        /* Released too early — ignore */
         ESP_LOGI(TAG, "Button released early — ignoring");
         ws2812_off();
         return;
     }
 
-    /* Held 3 seconds — solid green, wait for release */
-    ESP_LOGI(TAG, "3 seconds reached — release button to clear credentials");
-    ws2812_set_color(32, 0, 0);  /* solid green */
+    if (held_ms >= 10000) {
+        ESP_LOGI(TAG, "10 seconds reached — factory restore failsafe");
+        for (int i = 0; i < 6; i++) {
+            ws2812_set_color(64, 0, 0);  /* red blink */
+            vTaskDelay(pdMS_TO_TICKS(200));
+            ws2812_off();
+            vTaskDelay(pdMS_TO_TICKS(150));
+        }
 
+        const esp_partition_t *factory = esp_partition_find_first(
+            ESP_PARTITION_TYPE_APP,
+            ESP_PARTITION_SUBTYPE_APP_FACTORY,
+            NULL);
+
+        if (factory != NULL) {
+            ESP_LOGI(TAG, "Setting boot partition to factory: %s", factory->label);
+            esp_err_t err = esp_ota_set_boot_partition(factory);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to set boot partition to factory: %s",
+                         esp_err_to_name(err));
+            }
+        } else {
+            ESP_LOGE(TAG, "No factory app partition found");
+        }
+
+        provisioning_clear();
+        esp_restart();
+    }
+
+    /* Held for 3-10s: release to re-provision */
+    ESP_LOGI(TAG, "3 seconds reached — release button to clear credentials");
     while (gpio_get_level(RESET_BUTTON_GPIO) == 0) {
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 
-    /* Released — flash green 3 times to confirm, then clear */
     for (int i = 0; i < 3; i++) {
         ws2812_set_color(0, 64, 0);
         vTaskDelay(pdMS_TO_TICKS(150));
@@ -583,8 +674,109 @@ snprintf(payload, sizeof(payload),
          device_id, device);
 esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 1);    esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 1);
 
+    /* ── OTA update button ──────────────────────────────────────────────── */
+    snprintf(topic, sizeof(topic),
+             "homeassistant/button/aprilaire_e070_%s/ota_update/config",
+             device_id);
+    snprintf(payload, sizeof(payload),
+             "{"
+             "\"name\": \"Firmware Update\", "
+             "\"unique_id\": \"aprilaire_e070_%s_ota_update\", "
+             "\"command_topic\": \"aprilaire/ota\", "
+             "\"payload_press\": \"update\", "
+             "\"entity_category\": \"config\", "
+             "\"device_class\": \"update\", "
+             "%s}",
+             device_id, device);
+    esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 1);
+ 
+    /* ── OTA status sensor ──────────────────────────────────────────────── */
+    snprintf(topic, sizeof(topic),
+             "homeassistant/sensor/aprilaire_e070_%s/ota_status/config",
+             device_id);
+    snprintf(payload, sizeof(payload),
+             "{"
+             "\"name\": \"Firmware Update Status\", "
+             "\"unique_id\": \"aprilaire_e070_%s_ota_status\", "
+             "\"state_topic\": \"aprilaire/ota/status\", "
+             "\"value_template\": \"{{ value_json.state }}\", "
+             "\"entity_category\": \"diagnostic\", "
+             "%s}",
+             device_id, device);
+    esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 1);
+ 
     ESP_LOGI(TAG, "MQTT discovery published for device aprilaire_e070_%s",
              device_id);
+}
+
+static void ota_update_task(void *pvParameters)
+{
+    char ota_base_url[128] = {0};
+    char ota_full_url[160] = {0};
+ 
+    if (!provisioning_get_ota_url(ota_base_url, sizeof(ota_base_url))) {
+        ESP_LOGE(TAG, "OTA: no URL in NVS — run provisioning again");
+        esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_OTA_STATUS,
+                                "{\"state\": \"error\", \"msg\": \"no OTA URL configured\"}",
+                                0, 1, 0);
+        vTaskDelete(NULL);
+        return;
+    }
+ 
+    /* Strip trailing slash if present, then append binary name */
+    size_t url_len = strlen(ota_base_url);
+    if (url_len > 0 && ota_base_url[url_len - 1] == '/') {
+        ota_base_url[url_len - 1] = '\0';
+    }
+    snprintf(ota_full_url, sizeof(ota_full_url), "%s/rs485_test.bin", ota_base_url);
+ 
+    ESP_LOGI(TAG, "OTA: starting update from %s", ota_full_url);
+    esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_OTA_STATUS,
+                            "{\"state\": \"updating\"}",
+                            0, 1, 0);
+ 
+    esp_http_client_config_t http_cfg = {
+        .url            = ota_full_url,
+//        .cert_pem       = (char *)server_cert_pem_start,
+    };
+ 
+    esp_https_ota_config_t ota_cfg = {
+        .http_config = &http_cfg,
+    };
+ 
+    esp_err_t err = esp_https_ota(&ota_cfg);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "OTA: update successful — rebooting");
+        esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_OTA_STATUS,
+                                "{\"state\": \"success\"}",
+                                0, 1, 0);
+        vTaskDelay(pdMS_TO_TICKS(500));  /* let MQTT publish flush */
+        esp_restart();
+    } else {
+        ESP_LOGE(TAG, "OTA: update failed: %s", esp_err_to_name(err));
+        char msg[96];
+        snprintf(msg, sizeof(msg),
+                 "{\"state\": \"error\", \"msg\": \"%s\"}", esp_err_to_name(err));
+        esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_OTA_STATUS,
+                                msg, 0, 1, 0);
+    }
+ 
+    vTaskDelete(NULL);
+}
+ 
+static void trigger_ota_update(void)
+{
+    /* Spawn a task — OTA blocks for potentially 30+ seconds and must not
+     * run in the MQTT event callback context */
+    BaseType_t ret = xTaskCreate(ota_update_task, "ota_task",
+                                 8192,   /* OTA needs a larger stack */
+                                 NULL, 5, NULL);
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "OTA: failed to create task");
+        esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_OTA_STATUS,
+                                "{\"state\": \"error\", \"msg\": \"task create failed\"}",
+                                0, 1, 0);
+    }
 }
 
 static void mqtt_event_handler(void *arg, esp_event_base_t base,
@@ -596,6 +788,8 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base,
             ESP_LOGI(TAG, "MQTT connected to broker");
             esp_mqtt_client_subscribe(mqtt_client, MQTT_TOPIC_SET, 1);
             ESP_LOGI(TAG, "Subscribed to %s", MQTT_TOPIC_SET);
+            esp_mqtt_client_subscribe(mqtt_client, MQTT_TOPIC_OTA, 1);
+            ESP_LOGI(TAG, "Subscribed to %s", MQTT_TOPIC_OTA);
             mqtt_publish_discovery();
             break;
         case MQTT_EVENT_DISCONNECTED:
@@ -606,6 +800,17 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base,
                 strncmp(event->topic, MQTT_TOPIC_SET,
                     event->topic_len) == 0) {
                 handle_set_command(event->data, event->data_len);
+            } else if (event->topic_len > 0 &&
+                       strncmp(event->topic, MQTT_TOPIC_OTA,
+                           event->topic_len) == 0) {
+                /* Accept payload "update" (case-insensitive) */
+                if (event->data_len >= 6 &&
+                    strncasecmp(event->data, "update", 6) == 0) {
+                    ESP_LOGI(TAG, "OTA update requested via MQTT");
+                    trigger_ota_update();
+                } else {
+                    ESP_LOGW(TAG, "OTA: unknown command (expected 'update')");
+                }
             }
             break;
         case MQTT_EVENT_ERROR:
@@ -817,6 +1022,8 @@ void uart_init(void)
     uart_param_config(EX_UART_NUM, &uart_config);
 
     uart_set_pin(EX_UART_NUM, GPIO_NUM_5, GPIO_NUM_4, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    gpio_pullup_en(GPIO_NUM_4);
+
 //    uart_set_rx_full_threshold(EX_UART_NUM, 1);
     uart_set_rx_timeout(EX_UART_NUM, 10);
 
@@ -867,7 +1074,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT &&
                event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < WIFI_MAXIMUM_RETRY) {
+        if ((s_retry_num < WIFI_MAXIMUM_RETRY) || (WIFI_MAXIMUM_RETRY == 0)) {
             esp_wifi_connect();
             s_retry_num++;
             ESP_LOGI(TAG, "Retrying Wi-Fi connection (%d/%d)...",
@@ -1060,4 +1267,5 @@ void app_main(void)
         xTaskCreate(bme280_task, "bme280_task", 4096, NULL, 5, NULL);
         uart_init();
     }
+    confirm_and_commit_ota();
 }

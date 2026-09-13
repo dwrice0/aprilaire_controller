@@ -26,6 +26,7 @@ static const char *TAG = "provisioning";
 #define NVS_KEY_MQTT_PORT   "mqtt_port"
 #define NVS_KEY_MQTT_USER   "mqtt_user"
 #define NVS_KEY_MQTT_PASS   "mqtt_pass"
+#define NVS_KEY_OTA_URL     "ota_url"
 #define PROV_DONE_BIT       BIT0
 
 static EventGroupHandle_t s_prov_event_group;
@@ -60,6 +61,10 @@ static const char *PORTAL_HTML =
     "<input type='number' name='mqtt_port' placeholder='Port (default 1883)' value='1883'>"
     "<input type='text'     name='mqtt_user' placeholder='MQTT username (if required)'>"
     "<input type='password' name='mqtt_pass' placeholder='MQTT password (if required)'>"
+    "<div class='divider'></div>"
+    "<h3>OTA Update Server</h3>"
+    "<p class='hint'>Base URL where firmware updates are hosted (no filename)</p>"
+    "<input type='text' name='ota_url' placeholder='http://192.168.1.x:8070' required>"
     "<button type='submit'>Save &amp; Connect</button>"
     "</form>"
     "</body></html>";
@@ -139,14 +144,30 @@ void provisioning_clear(void)
     if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs) != ESP_OK) return;
     nvs_erase_key(nvs, NVS_KEY_SSID);
     nvs_erase_key(nvs, NVS_KEY_PASS);
+    nvs_erase_key(nvs, NVS_KEY_MQTT_HOST);
+    nvs_erase_key(nvs, NVS_KEY_MQTT_PORT);
+    nvs_erase_key(nvs, NVS_KEY_MQTT_USER);
+    nvs_erase_key(nvs, NVS_KEY_MQTT_PASS);
+    nvs_erase_key(nvs, NVS_KEY_OTA_URL);
     nvs_commit(nvs);
     nvs_close(nvs);
     ESP_LOGI(TAG, "Wi-Fi credentials cleared");
 }
 
+bool provisioning_get_ota_url(char *url, size_t url_len)
+{
+    nvs_handle_t nvs;
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs) != ESP_OK) return false;
+    bool ok = (nvs_get_str(nvs, NVS_KEY_OTA_URL, url, &url_len) == ESP_OK)
+              && strlen(url) > 0;
+    nvs_close(nvs);
+    return ok;
+}
+
 static esp_err_t save_credentials(const char *ssid, const char *password,
                                    const char *mqtt_host, int mqtt_port,
-                                   const char *mqtt_user, const char *mqtt_pass)
+                                   const char *mqtt_user, const char *mqtt_pass,
+                                   const char *ota_url)
 {
     nvs_handle_t nvs;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs);
@@ -158,6 +179,7 @@ static esp_err_t save_credentials(const char *ssid, const char *password,
     nvs_set_i32(nvs, NVS_KEY_MQTT_PORT, mqtt_port);
     nvs_set_str(nvs, NVS_KEY_MQTT_USER, mqtt_user);
     nvs_set_str(nvs, NVS_KEY_MQTT_PASS, mqtt_pass);
+    nvs_set_str(nvs, NVS_KEY_OTA_URL,   ota_url);
 
     err = nvs_commit(nvs);
     nvs_close(nvs);
@@ -238,6 +260,7 @@ static esp_err_t handler_save(httpd_req_t *req)
     char mqtt_port[8]  = {0};
     char mqtt_user[64] = {0};
     char mqtt_pass[64] = {0};
+    char ota_url[128]  = {0};
 
     parse_form_field(body, "ssid",      ssid,      sizeof(ssid));
     parse_form_field(body, "password",  password,  sizeof(password));
@@ -245,17 +268,18 @@ static esp_err_t handler_save(httpd_req_t *req)
     parse_form_field(body, "mqtt_port", mqtt_port, sizeof(mqtt_port));
     parse_form_field(body, "mqtt_user", mqtt_user, sizeof(mqtt_user));
     parse_form_field(body, "mqtt_pass", mqtt_pass, sizeof(mqtt_pass));
+    parse_form_field(body, "ota_url",   ota_url,   sizeof(ota_url));
 
-    if (strlen(ssid) == 0 || strlen(mqtt_host) == 0) {
+    if (strlen(ssid) == 0 || strlen(mqtt_host) == 0 || strlen(ota_url) == 0) {
         httpd_resp_set_status(req, "400 Bad Request");
-        httpd_resp_send(req, "SSID and MQTT host required", 27);
+        httpd_resp_send(req, "SSID, MQTT host, and OTA URL required", 37);
         return ESP_FAIL;
     }
 
     int port = strlen(mqtt_port) > 0 ? atoi(mqtt_port) : 1883;
 
     if (save_credentials(ssid, password, mqtt_host, port,
-                         mqtt_user, mqtt_pass) == ESP_OK) {
+                         mqtt_user, mqtt_pass, ota_url) == ESP_OK) {
         httpd_resp_set_type(req, "text/html");
         httpd_resp_send(req, SUCCESS_HTML, strlen(SUCCESS_HTML));
         xEventGroupSetBits(s_prov_event_group, PROV_DONE_BIT);
