@@ -34,7 +34,12 @@
 #include "esp_ota_ops.h"
 
 static const char *TAG = "aprilaire";
-static const char *APP_VERSION = "aprilaire-v1.2.3";
+
+#ifndef APP_VERSION
+#define APP_VERSION "aprilaire-dev"
+#endif
+
+static const char *APP_VERSION_STR = APP_VERSION;
 
 #define RESET_BUTTON_GPIO GPIO_NUM_10
 #define RGB_LED_GPIO        GPIO_NUM_8
@@ -235,12 +240,6 @@ static void confirm_and_commit_ota(void)
 /* ═══════════════════════════════════════════════════════════════════════════
  * Reset button check
  * ═══════════════════════════════════════════════════════════════════════════ */
-
-static bool running_from_factory_partition(void)
-{
-    const esp_partition_t *running = esp_ota_get_running_partition();
-    return running != NULL && running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY;
-}
 
 static void check_reset_button(void)
 {
@@ -1236,6 +1235,7 @@ void app_main(void)
 {
     esp_log_level_set(TAG, ESP_LOG_INFO);
     ESP_LOGI(TAG, "Starting AprilAire RS485 Controller...");
+    ESP_LOGI(TAG, "Firmware version: %s", APP_VERSION_STR);
     nvs_flash_init();
     ESP_LOGI(TAG, "ESP-NVS initialized");
     esp_netif_init();

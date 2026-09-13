@@ -31,7 +31,7 @@ static const char *TAG = "provisioning";
 
 static EventGroupHandle_t s_prov_event_group;
 static char s_ssid[64]     = {0};
-static char s_password[64] = {0};
+//static char s_password[64] = {0};
 
 /* ── HTML portal page ───────────────────────────────────────────────────── */
 static const char *PORTAL_HTML =
