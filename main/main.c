@@ -1234,6 +1234,7 @@ static void bme280_task(void *pvParameters)
 void app_main(void)
 {
     esp_log_level_set(TAG, ESP_LOG_INFO);
+    esp_log_level_set("wifi", ESP_LOG_WARN);
     ESP_LOGI(TAG, "Starting AprilAire RS485 Controller...");
     ESP_LOGI(TAG, "Firmware version: %s", APP_VERSION_STR);
     nvs_flash_init();
