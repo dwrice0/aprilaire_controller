@@ -545,10 +545,10 @@ static void mqtt_publish_discovery(void)
              "\"identifiers\": [\"aprilaire_e070_%s\"], "
              "\"name\": \"AprilAire E070 Dehumidifier\", "
              "\"model\": \"E070\", "
-             "\"manufacturer\": \"DR\", "
-             "\"sw_version\": \"0.0.1\""
+             "\"manufacturer\": \"dwrice0\", "
+             "\"sw_version\": \"%s\""
              "}",
-             device_id);
+             device_id, APP_VERSION_STR);
 
     char topic[128];
     char payload[768];
